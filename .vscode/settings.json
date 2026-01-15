@@ -1,0 +1,13 @@
+{
+    // 强制 Python 解释器指向虚拟环境
+    // 如果你是 Windows，请使用下面的路径：
+    "python.defaultInterpreterPath": "${workspaceFolder}/venv/Scripts/python.exe",
+    // 如果你是 Mac/Linux，请使用下面的路径（把上面那行删掉或注释掉）：
+    // "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
+    // 告诉终端启动时自动激活环境
+    "python.terminal.activateEnvironment": true,
+    // 告诉 AI 编辑器分析代码时参考 venv 里的包
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/venv/Lib/site-packages"
+    ]
+}
