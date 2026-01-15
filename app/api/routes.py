@@ -1,10 +1,11 @@
 import os
 import shutil
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile, BackgroundTasks
 from fastapi.responses import FileResponse
 
 from app.core.config import get_settings
+from app.core.logger import logger
 from app.services.converter_service import ConverterService
 
 router = APIRouter()
@@ -22,6 +23,17 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
+def remove_file(path: str):
+    """
+    Helper to remove a file and log any errors.
+    """
+    try:
+        os.remove(path)
+        logger.debug(f"Removed temporary file: {path}")
+    except Exception as e:
+        logger.warning(f"Failed to remove temporary file {path}: {e}")
+
+
 @router.get("/health")
 async def health_check():
     return {
@@ -32,7 +44,10 @@ async def health_check():
 
 
 @router.post("/convert", response_class=FileResponse)
-async def convert_file(file: UploadFile = File(...)):
+async def convert_file(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...)
+):
     """
     Upload a file and convert it based on its extension.
     """
@@ -59,6 +74,10 @@ async def convert_file(file: UploadFile = File(...)):
 
         filename = os.path.basename(output_path)
         
+        # Register cleanup tasks
+        background_tasks.add_task(remove_file, input_path)
+        background_tasks.add_task(remove_file, output_path)
+
         # Return file
         return FileResponse(
             path=output_path,
@@ -71,7 +90,4 @@ async def convert_file(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
     finally:
-        # Optional: cleanup input file here if desired?
-        # For now, we leave them in temp/ as per implicit requirement ("Temporary storage")
-        # Real production might want a background task to clean this up.
         file.file.close()
