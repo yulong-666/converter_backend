@@ -12,12 +12,12 @@ class ConverterMeta(BaseModel):
         name (str): Unique name of the plugin (e.g., "word2pdf").
         description (str): Brief description of what the plugin does.
         source_format (str): The extension of the source file (e.g., ".docx").
-        target_format (str): The extension of the target file (e.g., ".pdf").
+        supported_targets (list[str]): List of supported target format extensions (e.g., [".pdf", ".txt"]).
     """
     name: str
     description: str
     source_format: str
-    target_format: str
+    supported_targets: list[str]
 
 
 class BaseConverter(ABC):
@@ -36,13 +36,14 @@ class BaseConverter(ABC):
         pass
 
     @abstractmethod
-    async def convert(self, input_path: str, output_path: str, **kwargs: Any) -> str:
+    async def convert(self, input_path: str, output_path: str, target_format: str, **kwargs: Any) -> str:
         """
         Execute the file conversion logic.
 
         Args:
             input_path (str): Absolute path to the input file.
             output_path (str): Absolute path where the output file should be saved.
+            target_format (str): The desired target format extension (e.g., ".pdf").
             **kwargs: Additional keyword arguments for the conversion process.
 
         Returns:

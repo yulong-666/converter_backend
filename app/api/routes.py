@@ -1,7 +1,7 @@
 import os
 import shutil
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, BackgroundTasks
+from fastapi import APIRouter, File, HTTPException, UploadFile, BackgroundTasks, Form
 from fastapi.responses import FileResponse
 
 from app.core.config import get_settings
@@ -43,16 +43,28 @@ async def health_check():
     }
 
 
+@router.get("/capabilities")
+async def get_capabilities():
+    """
+    Get the list of supported conversions.
+    """
+    return converter_service.get_supported_conversions()
+
+
 @router.post("/convert", response_class=FileResponse)
 async def convert_file(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    target_format: str = Form(...)
 ):
     """
     Upload a file and convert it based on its extension.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is missing")
+
+    input_path = None
+    output_path = None
 
     try:
         # Generate input path
@@ -66,7 +78,7 @@ async def convert_file(
             shutil.copyfileobj(file.file, buffer)
 
         # Execute conversion
-        output_path = await converter_service.execute_conversion(input_path, OUTPUT_DIR)
+        output_path = await converter_service.execute_conversion(input_path, OUTPUT_DIR, target_format=target_format)
         
         # Verify output exists
         if not os.path.exists(output_path):
@@ -74,7 +86,7 @@ async def convert_file(
 
         filename = os.path.basename(output_path)
         
-        # Register cleanup tasks
+        # Register cleanup tasks (Success Case)
         background_tasks.add_task(remove_file, input_path)
         background_tasks.add_task(remove_file, output_path)
 
@@ -85,9 +97,16 @@ async def convert_file(
             media_type="application/octet-stream"
         )
 
-    except HTTPException as he:
-        raise he
     except Exception as e:
+        # cleanup on failure
+        if input_path and os.path.exists(input_path):
+            remove_file(input_path)
+        # If output path was somehow created but we are failing, clean it too
+        if output_path and os.path.exists(output_path):
+            remove_file(output_path)
+
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
     finally:
         file.file.close()

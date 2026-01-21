@@ -18,24 +18,27 @@ class JsonToMdConverter(BaseConverter):
             name="json2md",
             description="Convert JSON data to Markdown code block",
             source_format=".json",
-            target_format=".md",
+            supported_targets=[".md"],
         )
 
-    async def convert(self, input_path: str, output_path: str, **kwargs: Any) -> str:
+    async def convert(self, input_path: str, output_path: str, target_format: str, **kwargs: Any) -> str:
         """
         Convert a JSON file to a Markdown file containing the JSON data in a code block.
 
         Args:
             input_path (str): Path to the source JSON file.
             output_path (str): Path where the Markdown file will be saved.
+            target_format (str): The desired target format (must be ".md").
             **kwargs: Additional arguments (unused).
 
         Returns:
             str: Path to the generated Markdown file.
 
         Raises:
-            ValueError: If the input file is not valid JSON.
+            ValueError: If the input file is not valid JSON or target format is unsupported.
         """
+        if target_format not in self.meta.supported_targets:
+            raise ValueError(f"Target format {target_format} is not supported by {self.meta.name}")
         try:
             # Asynchronously read the input JSON file
             async with aiofiles.open(input_path, mode="r", encoding="utf-8") as f:
