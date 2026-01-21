@@ -12,6 +12,10 @@ class JsonToMdConverter(BaseConverter):
     Converter that transforms JSON files into Markdown code blocks.
     """
 
+    @classmethod
+    def supported_source_formats(cls) -> list[str]:
+        return [".json"]
+
     @property
     def meta(self) -> ConverterMeta:
         return ConverterMeta(

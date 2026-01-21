@@ -14,6 +14,10 @@ class ImageConverter(BaseConverter):
     def __init__(self, source_format: str):
         self._source_format = source_format
 
+    @classmethod
+    def supported_source_formats(cls) -> list[str]:
+        return [".jpg", ".jpeg", ".png", ".webp"]
+
     @property
     def meta(self) -> ConverterMeta:
         return ConverterMeta(

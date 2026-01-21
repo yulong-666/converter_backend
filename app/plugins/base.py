@@ -63,3 +63,15 @@ class BaseConverter(ABC):
             bool: True if valid, False otherwise. Defaults to True.
         """
         return True
+
+    @classmethod
+    @abstractmethod
+    def supported_source_formats(cls) -> list[str]:
+        """
+        Return a list of source formats (extensions) that this converter class supports.
+        This is used for automatic discovery and registration.
+        
+        Returns:
+            list[str]: E.g., ['.jpg', '.png'] or ['.json']
+        """
+        pass

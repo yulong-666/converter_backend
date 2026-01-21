@@ -13,6 +13,10 @@ class PdfConverter(BaseConverter):
     Supports conversion to DOCX, PNG, TXT, and MD.
     """
 
+    @classmethod
+    def supported_source_formats(cls) -> list[str]:
+        return [".pdf"]
+
     @property
     def meta(self) -> ConverterMeta:
         return ConverterMeta(

@@ -4,11 +4,11 @@ from typing import Dict
 from fastapi import HTTPException
 from loguru import logger
 
+import importlib
+import pkgutil
+import inspect
+import app.plugins
 from app.plugins.base import BaseConverter
-from app.plugins.json_to_md import JsonToMdConverter
-from app.plugins.pdf_plugin import PdfConverter
-from app.plugins.image_plugin import ImageConverter
-
 
 class ConverterService:
     """
@@ -25,25 +25,57 @@ class ConverterService:
 
     def _register_plugins(self):
         """
-        Register all available converter plugins.
+        Dynamically register all available converter plugins from app.plugins package.
         """
-        # Register JsonToMdConverter
-        json_converter = JsonToMdConverter()
-        source_format = json_converter.meta.source_format
-        self._plugins[source_format] = json_converter
-        logger.info(f"Registered plugin: {json_converter.meta.name} for {source_format}")
+        package_path = os.path.dirname(app.plugins.__file__)
+        package_name = app.plugins.__name__
 
-        # Register PdfConverter
-        pdf_converter = PdfConverter()
-        self._plugins[pdf_converter.meta.source_format] = pdf_converter
-        logger.info(f"Registered plugin: {pdf_converter.meta.name} for {pdf_converter.meta.source_format}")
+        # Iterate over all modules in the app.plugins package
+        for _, name, _ in pkgutil.iter_modules([package_path]):
+            # Skip base module
+            if name == "base":
+                continue
+            
+            try:
+                # Import module
+                module = importlib.import_module(f"{package_name}.{name}")
+                
+                # Inspect module for BaseConverter subclasses
+                for _, obj in inspect.getmembers(module):
+                    if (inspect.isclass(obj) and 
+                        issubclass(obj, BaseConverter) and 
+                        obj is not BaseConverter):
+                        
+                        # Use the new supported_source_formats method
+                        source_formats = obj.supported_source_formats()
+                        
+                        for fmt in source_formats:
+                            # Instantiate with specific source format if the init takes it, 
+                            # or default init if compatible.
+                            # Most our plugins taking 'source_format' in init work fine with this.
+                            try:
+                                # We check signature ?? Or just assume convention.
+                                # Convention: __init__(self, source_format=default) or ()
+                                # If we pass source_format, multi-format plugins work.
+                                # Single format plugins (JsonToMd) don't have source_format in init (implicit).
+                                # We might need to inspect signature.
+                                
+                                sig = inspect.signature(obj.__init__)
+                                if 'source_format' in sig.parameters:
+                                    instance = obj(source_format=fmt)
+                                else:
+                                    instance = obj()
+                                    # Verification: if instance.meta.source_format != fmt...
+                                    # Single source plugins like JsonToMd hardcode source_format in meta.
+                                    # If they claim to support '.json' but strict check fails, that's their bug.
+                                
+                                self._plugins[fmt] = instance
+                                logger.info(f"Registered plugin: {instance.meta.name} for {fmt}")
+                            except Exception as e:
+                                logger.error(f"Failed to instantiate plugin {obj.__name__} for {fmt}: {e}")
 
-        # Register ImageConverters
-        image_formats = [".jpg", ".jpeg", ".png", ".webp"]
-        for fmt in image_formats:
-            img_converter = ImageConverter(source_format=fmt)
-            self._plugins[fmt] = img_converter
-            logger.info(f"Registered plugin: {img_converter.meta.name} for {fmt}")
+            except Exception as e:
+                logger.error(f"Error loading plugin module {name}: {e}")
 
     def get_converter(self, filename: str) -> BaseConverter:
         """

@@ -4,95 +4,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Converter Backend - Universal Converter</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Universal Converter P3</title>
+    <!-- Fonts: Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=3">
 </head>
 
 <body>
-    <div class="background-glow"></div>
 
-    <div class="container">
-        <header>
-            <div class="logo">
-                <span class="logo-icon">⚡</span>
-                <h1>Universal Converter</h1>
-            </div>
-            <p class="subtitle">Transform your files instantly with our premium backend.</p>
-        </header>
+    <!-- Header / Branding -->
+    <header class="app-header">
+        <div class="logo">
+            <span class="icon">⚡</span>
+            <h1>UniConvert</h1>
+        </div>
+        <div class="user-menu">
+            <!-- Placeholder for user interactions -->
+            <button class="icon-btn">?</button>
+        </div>
+    </header>
 
-        <main>
-            <!-- Search Section -->
-            <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Search tools (e.g., 'pdf', 'word')..."
-                    autocomplete="off">
-            </div>
+    <!-- Hero Search Section -->
+    <section id="hero" class="hero-section">
+        <h2 class="hero-title">What do you want to convert today?</h2>
+        <div class="search-container">
+            <input type="text" id="tool-search" placeholder="Search tools (e.g. PDF to Word, JSON to MD)..."
+                autocomplete="off">
+            <span class="search-icon">🔍</span>
+        </div>
+    </section>
 
-            <!-- Tools Grid -->
-            <div id="toolsGrid" class="tools-grid">
-                <!-- Dynamic cards will be injected here -->
-            </div>
+    <!-- Capabilities Grid -->
+    <main>
+        <div id="tools-grid" class="tools-grid">
+            <!-- Dynamic Content Loop -->
+            <!-- Cards will be injected by JS -->
+        </div>
 
-            <!-- Upload Modal (Hidden by default) -->
-            <div id="uploadModal" class="modal hidden">
-                <div class="modal-content converter-card">
-                    <span class="close-modal" id="closeModal">&times;</span>
+        <div id="no-results" class="hidden">
+            <p>No tools found matching your search. Try different keywords.</p>
+        </div>
+    </main>
 
-                    <h2 id="modalTitle">Convert File</h2>
-
-                    <!-- Upload Drop Zone -->
-                    <div class="drop-zone" id="dropZone">
-                        <div class="icon-container">
-                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
-                                xmlns="http://www.w3.org/2000/svg">
-                                <path
-                                    d="M7 10V9C7 6.23858 9.23858 4 12 4C14.7614 4 17 6.23858 17 9V10C19.2091 10 21 11.7909 21 14C21 15.4806 20.1956 16.8084 19 17.5M7 10C4.79086 10 3 11.7909 3 14C3 15.4806 3.8044 16.8084 5 17.5M7 10V9M12 20V12M12 12L9 15M12 12L15 15"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                            </svg>
-                        </div>
-                        <h3>Drag & Drop your file here</h3>
-                        <p>or</p>
-                        <button class="btn-select" id="fileSelectBtn">Browse Files</button>
-                        <input type="file" id="fileInput" hidden>
-                        <p class="limit-text" id="modalFormatInfo">Supports: .pdf -> .docx</p>
-                    </div>
-
-                    <!-- Progress Section -->
-                    <div class="progress-section hidden" id="progressSection">
-                        <div class="file-info">
-                            <span class="file-name" id="fileName">example.pdf</span>
-                            <span class="status-text" id="statusText">Uploading...</span>
-                        </div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar" id="progressBar"></div>
-                        </div>
-                    </div>
-
-                    <!-- Result Section -->
-                    <div class="result-section hidden" id="resultSection">
-                        <div class="success-icon">✓</div>
-                        <h3>Conversion Complete!</h3>
-                        <div class="actions">
-                            <button class="btn-download" id="downloadBtn">Download Converted File</button>
-                            <button class="btn-reset" id="resetBtn">Convert Another</button>
-                        </div>
-                    </div>
-
-                    <!-- Error Message -->
-                    <div class="error-message hidden" id="errorMessage"></div>
+    <!-- Modal for Target Format Selection -->
+    <div id="conversion-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h3 id="modal-title">Convert .PDF</h3>
+                <button id="close-modal" class="close-btn">&times;</button>
+            </header>
+            <div class="modal-body">
+                <p>Select target format:</p>
+                <div id="target-formats-grid" class="targets-grid">
+                    <!-- Target buttons injected here -->
                 </div>
             </div>
-        </main>
-
-        <footer>
-            <p>Powered by FastAPI & Python 3.11</p>
-        </footer>
+            <!-- Progress / Status Area inside Modal or nearby -->
+            <div id="upload-status" class="status-area hidden">
+                <div class="progress-bar-container">
+                    <div id="progress-bar" class="progress-bar"></div>
+                </div>
+                <p id="status-text">Uploading...</p>
+                <a id="download-link" href="#" class="download-btn hidden" download>Download File</a>
+            </div>
+        </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Hidden File Input -->
+    <!-- We trigger this programmatically after user selects a target format -->
+    <input type="file" id="file-input" style="display: none;">
+
+    <script src="script.js?v=3"></script>
 </body>
 
 </html>

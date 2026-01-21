@@ -1,255 +1,201 @@
-// DOM Elements
-const searchInput = document.getElementById('searchInput');
-const toolsGrid = document.getElementById('toolsGrid');
-const uploadModal = document.getElementById('uploadModal');
-const closeModalBtn = document.getElementById('closeModal');
-const modalTitle = document.getElementById('modalTitle');
-const modalFormatInfo = document.getElementById('modalFormatInfo');
-
-// Modal Elements
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
-const fileSelectBtn = document.getElementById('fileSelectBtn');
-const progressSection = document.getElementById('progressSection');
-const progressBar = document.getElementById('progressBar');
-const statusText = document.getElementById('statusText');
-const fileNameDisplay = document.getElementById('fileName');
-const resultSection = document.getElementById('resultSection');
-const downloadBtn = document.getElementById('downloadBtn');
-const resetBtn = document.getElementById('resetBtn');
-const errorMessage = document.getElementById('errorMessage');
-
 // State
-let capabilities = {}; // { ".pdf": [".docx", ".png"], ... }
-let currentConversion = { source: null, target: null }; // { source: ".pdf", target: ".docx" }
-let currentBlob = null;
-let currentFilename = "";
+let capabilities = {}; // e.g. { ".pdf": ["docx", "png"], ... }
+let currentSourceExt = null;
+let currentTargetExt = null;
 
-// Initialization
+// DOM Elements
+const grid = document.getElementById('tools-grid');
+const searchInput = document.getElementById('tool-search');
+const noResults = document.getElementById('no-results');
+const modal = document.getElementById('conversion-modal');
+const modalTitle = document.getElementById('modal-title');
+const targetGrid = document.getElementById('target-formats-grid');
+const closeModalBtn = document.getElementById('close-modal');
+const fileInput = document.getElementById('file-input');
+const uploadStatus = document.getElementById('upload-status');
+const progressBar = document.getElementById('progress-bar');
+const statusText = document.getElementById('status-text');
+const downloadLink = document.getElementById('download-link');
+
+// Lifecycle
 document.addEventListener('DOMContentLoaded', async () => {
     await fetchCapabilities();
-    renderGrid();
-    setupEventListeners();
+    renderGrid(capabilities); // Initial render
 });
 
 // 1. Fetch Capabilities
 async function fetchCapabilities() {
     try {
         const res = await fetch('/api/v1/capabilities');
-        if (!res.ok) throw new Error('Failed to fetch tools');
-        capabilities = await res.json();
+        const data = await res.json();
+        // Backend returns: { "conversions": { ".jpg": [".png"], ".pdf": [".docx"] } } or similar
+        // Adjust based on verified tests from previous turn (Plan C assumption)
+        // If backend returns root object as the map, use data directly.
+        // Let's assume standardized response format, but if it is straight dict, handled here.
+        if (data.conversions) {
+            capabilities = data.conversions;
+        } else {
+            capabilities = data;
+        }
+        console.log('Loaded capabilities:', capabilities);
     } catch (err) {
-        console.error(err);
-        toolsGrid.innerHTML = `<div class="error-message">Failed to load tools. Please refresh.</div>`;
+        console.error('Failed to load capabilities:', err);
+        grid.innerHTML = '<p class="error">Error loading tools. Please try again later.</p>';
     }
 }
 
 // 2. Render Grid
-function renderGrid(filterText = "") {
-    toolsGrid.innerHTML = "";
-    filterText = filterText.toLowerCase();
+function renderGrid(caps, filterQuery = '') {
+    grid.innerHTML = '';
+    let matches = 0;
 
-    Object.keys(capabilities).forEach(sourceExt => {
-        const targets = capabilities[sourceExt];
-        // Filter logic: Check if source or any target matches filter
-        const sourceName = sourceExt.replace('.', '').toUpperCase();
-        const matchesSource = sourceName.toLowerCase().includes(filterText);
+    // caps structure: { ".pdf": [".target1", ".target2"] }
+    // We want to create cards like "PDF Tools"
 
-        const matchingTargets = targets.filter(t => {
-            const targetName = t.replace('.', '').toUpperCase();
-            return matchesSource || targetName.toLowerCase().includes(filterText);
-        });
+    Object.keys(caps).forEach(sourceExt => {
+        // Clean extension for display (e.g. .pdf -> PDF)
+        const displaySource = sourceExt.replace('.', '').toUpperCase();
+        const targets = caps[sourceExt];
 
-        if (matchingTargets.length > 0) {
-            const card = createToolCard(sourceExt, matchingTargets);
-            toolsGrid.appendChild(card);
+        // Search Logic: Match 'PDF', 'Word', '.docx' etc.
+        // If filter is empty, show all.
+        // If filter exists, check if source OR any target matches.
+        const query = filterQuery.toLowerCase();
+        const targetsString = targets.join(' ').toLowerCase();
+        const sourceString = displaySource.toLowerCase();
+
+        // Check if this card is relevant
+        const isMatch = !filterQuery ||
+            sourceString.includes(query) ||
+            targetsString.includes(query);
+
+        if (isMatch) {
+            matches++;
+            const card = document.createElement('div');
+            card.className = 'tool-card';
+            card.innerHTML = `
+                <div class="card-icon">📄</div>
+                <div class="card-title">${displaySource} Tools</div>
+                <div class="card-desc">Convert ${displaySource} to ${targets.length} formats</div>
+            `;
+            card.onclick = () => openModal(sourceExt, targets);
+            grid.appendChild(card);
         }
     });
 
-    if (toolsGrid.innerHTML === "") {
-        toolsGrid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">No tools found matching "${filterText}"</div>`;
+    if (matches === 0) {
+        noResults.classList.remove('hidden');
+    } else {
+        noResults.classList.add('hidden');
     }
 }
 
-function createToolCard(sourceExt, targets) {
-    const sourceName = sourceExt.replace('.', '').toUpperCase();
-
-    // Icon mapping (simple)
-    let icon = "📄";
-    if (['.jpg', '.png', '.jpeg', '.webp'].includes(sourceExt)) icon = "🖼️";
-    if (sourceExt === '.pdf') icon = "📕";
-    if (sourceExt === '.json') icon = "💻";
-
-    const div = document.createElement('div');
-    div.className = 'tool-card';
-    div.innerHTML = `
-        <div class="tool-header">
-            <div class="tool-icon">${icon}</div>
-            <div class="tool-title">${sourceName} Converter</div>
-        </div>
-        <div class="target-list">
-            ${targets.map(t => {
-        const targetName = t.replace('.', '').toUpperCase();
-        return `<button class="target-btn" data-source="${sourceExt}" data-target="${t}">to ${targetName}</button>`;
-    }).join('')}
-        </div>
-    `;
-
-    // Add click handlers for buttons
-    div.querySelectorAll('.target-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation(); // prevent card click if we add one
-            const s = btn.dataset.source;
-            const t = btn.dataset.target;
-            openModal(s, t);
-        });
-    });
-
-    return div;
-}
-
-// 3. Search Listener
+// 3. Search Handler
 searchInput.addEventListener('input', (e) => {
-    renderGrid(e.target.value);
+    const query = e.target.value.trim();
+    renderGrid(capabilities, query);
 });
-
 
 // 4. Modal Logic
-function openModal(source, target) {
-    currentConversion = { source, target };
+function openModal(sourceExt, targets) {
+    currentSourceExt = sourceExt;
 
-    // UI Updates
-    modalTitle.textContent = `${source.toUpperCase()} to ${target.toUpperCase()}`;
-    modalFormatInfo.textContent = `Supports: ${source} -> ${target}`;
+    // Set UI
+    const displaySource = sourceExt.replace('.', '').toUpperCase();
+    modalTitle.textContent = `Convert ${displaySource} File`;
+    targetGrid.innerHTML = ''; // Clear previous
 
-    resetUI(); // Reset upload state
-    uploadModal.classList.remove('hidden');
-}
+    // Reset status area
+    uploadStatus.classList.add('hidden');
+    progressBar.style.width = '0%';
+    downloadLink.classList.add('hidden');
 
-closeModalBtn.addEventListener('click', () => {
-    uploadModal.classList.add('hidden');
-});
-
-// Close click outside
-window.addEventListener('click', (e) => {
-    if (e.target === uploadModal) {
-        uploadModal.classList.add('hidden');
-    }
-});
-
-
-// 5. Upload Handling (Reused logic)
-function setupEventListeners() {
-    fileSelectBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', handleFileSelect);
-
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-    });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        const files = e.dataTransfer.files;
-        if (files.length) handleFile(files[0]);
+    // Create target buttons
+    targets.forEach(targetExt => {
+        const displayTarget = targetExt.replace('.', '').toUpperCase();
+        const btn = document.createElement('button');
+        btn.className = 'target-btn';
+        btn.textContent = `to ${displayTarget}`;
+        btn.onclick = () => selectTarget(targetExt);
+        targetGrid.appendChild(btn);
     });
 
-    resetBtn.addEventListener('click', resetUI);
-    downloadBtn.addEventListener('click', () => {
-        if (currentBlob) {
-            const url = window.URL.createObjectURL(currentBlob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = currentFilename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-        }
-    });
+    modal.classList.remove('hidden');
 }
 
-function handleFileSelect(e) {
-    if (e.target.files.length) handleFile(e.target.files[0]);
+closeModalBtn.onclick = () => {
+    modal.classList.add('hidden');
+    // Clear selection state
+    currentSourceExt = null;
+    currentTargetExt = null;
+};
+
+// Start selection flow
+function selectTarget(targetExt) {
+    currentTargetExt = targetExt;
+    console.log(`Selected conversion: ${currentSourceExt} -> ${currentTargetExt}`);
+    // Trigger file input
+    fileInput.click();
 }
 
-function handleFile(file) {
-    // Validate Extension?? Backend does it, but we could too.
-    // For now, let's just upload.
+// 5. File Upload & Conversion
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    // Reset state
-    errorMessage.classList.add('hidden');
-    resultSection.classList.add('hidden');
-
-    // Show progress
-    dropZone.classList.add('hidden');
-    progressSection.classList.remove('hidden');
-    fileNameDisplay.textContent = file.name;
-    statusText.textContent = "Uploading & Converting...";
+    // Show Progress
+    uploadStatus.classList.remove('hidden');
+    statusText.textContent = `Converting ${file.name}...`;
     progressBar.style.width = '30%';
 
-    uploadFile(file);
-}
-
-async function uploadFile(file) {
+    // Prepare Payload
     const formData = new FormData();
     formData.append('file', file);
-    // CRITICAL: Append target format
-    formData.append('target_format', currentConversion.target);
+    formData.append('target_format', currentTargetExt); // IMPORTANT: Backend needs this
 
     try {
+        progressBar.style.width = '60%';
         const response = await fetch('/api/v1/convert', {
             method: 'POST',
             body: formData
         });
 
-        progressBar.style.width = '80%';
-
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Conversion failed');
+            const errData = await response.json();
+            throw new Error(errData.detail || 'Conversion failed');
         }
 
-        // Get filename
-        const disposition = response.headers.get('content-disposition');
-        let filename = 'converted-file';
-        if (disposition && disposition.indexOf('attachment') !== -1) {
-            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-            const matches = filenameRegex.exec(disposition);
-            if (matches != null && matches[1]) {
-                filename = matches[1].replace(/['"]/g, '');
-            }
+        // Handle Download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        // Suggest filename
+        const contentDisp = response.headers.get('content-disposition');
+        let filename = 'converted-file' + currentTargetExt; // Fallback
+        if (contentDisp && contentDisp.includes('filename=')) {
+            filename = contentDisp.split('filename=')[1].replace(/"/g, '');
         }
-        currentFilename = filename;
 
-        currentBlob = await response.blob();
-
-        // Complete
+        // Update UI Success
         progressBar.style.width = '100%';
-        setTimeout(() => {
-            progressSection.classList.add('hidden');
-            resultSection.classList.remove('hidden');
-        }, 500);
+        statusText.textContent = "Done!";
+        downloadLink.href = url;
+        downloadLink.download = filename;
+        downloadLink.classList.remove('hidden');
 
     } catch (error) {
-        showError(error.message);
+        console.error(error);
+        statusText.textContent = `Error: ${error.message}`;
+        progressBar.style.backgroundColor = '#ef4444'; // Red
+    } finally {
+        // Clear input so same file can be selected again
+        fileInput.value = '';
     }
-}
+});
 
-function showError(msg) {
-    progressSection.classList.add('hidden');
-    dropZone.classList.remove('hidden');
-    errorMessage.textContent = msg;
-    errorMessage.classList.remove('hidden');
-}
-
-function resetUI() {
-    resultSection.classList.add('hidden');
-    progressSection.classList.add('hidden');
-    errorMessage.classList.add('hidden');
-    dropZone.classList.remove('hidden');
-    fileInput.value = '';
-    currentBlob = null;
-    progressBar.style.width = '0%';
-}
+// Close modal on click outside content
+window.onclick = (event) => {
+    if (event.target == modal) {
+        closeModalBtn.click();
+    }
+};
